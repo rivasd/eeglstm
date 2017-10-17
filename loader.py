@@ -30,18 +30,19 @@ parser = argparse.ArgumentParser()
 parser.add_argument("file", help="full path to the BDF file you wish to read and learn from")
 args = parser.parse_args()
 
-# load the specified file into memory
+
 #TODO: might be too large? find way to load in steps or distributed
 
 bdfData = pyedflib.EdfReader(args.file)
-n = bdfData.signals_in_file
+n = bdfData.signals_in_file - 1            # Assume that one of the channels in the file is the Status Channel. we wont be learning from it since its scale means nothing
 numSamples = bdfData.getNSamples()[0] #assuming all channels have the same total number of samples for this recording
 
 #load all data in memory
 #TODO: add hook to exclude some channels (like eye saccade ref)
 fullData = np.zeros((n, numSamples))
 for i in range(0, n):
-    fullData[i] = bdfData.readSignal(i)
+    if bdfData.getLabel(i) != "Status":
+        fullData[i] = bdfData.readSignal(i)
 
 
 
