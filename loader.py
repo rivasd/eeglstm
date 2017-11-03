@@ -34,26 +34,33 @@ args = parser.parse_args()
 #TODO: might be too large? find way to load in steps or distributed
 
 bdfData = pyedflib.EdfReader(args.file)
-n = bdfData.signals_in_file - 1            # Assume that one of the channels in the file is the Status Channel. we wont be learning from it since its scale means nothing
+channels = bdfData.signals_in_file - 1            # Assume that one of the channels in the file is the Status Channel. we wont be learning from it since its scale means nothing
 numSamples = bdfData.getNSamples()[0] #assuming all channels have the same total number of samples for this recording
 
 #load all data in memory
-#TODO: add hook to exclude some channels (like eye saccade ref)
-fullData = np.zeros((n, numSamples))
-for i in range(0, n):
+#TODO: add hook to exclude some channels (like facial electrodes ref)
+fullData = np.zeros((channels, numSamples))
+for i in range(0, channels):
     if bdfData.getLabel(i) != "Status":
         fullData[i] = bdfData.readSignal(i)
 
+# we need to keep buffers for the running average and variance
 
+averages    = np.zeros(channels)
+variances   = np.zeros(channels)
 
-fullData = fullData.astype(np.float32, copy=False) #Probably no need for full double-precision ? verify
+# replace the data with its normalized version usign the pre processing of Schirrmeister et al. 2017. code freely copied from their github
+
+starting_means  = np.mean(fullData, axis=tuple(range(1, len(fullData.shape))), keepdims=True)
+starting_std    = np.std()
+
 
 # EEG referencing probably not needed since we standardize every window by substrating the image mean and dividing by the standard deviation
 
 # contructing our training tensors
 
-X_training = np.zeros((numSamples - sampleLength, n, sampleLength, 1))
-Y_training = np.zeros((numSamples - sampleLength, n, 1))
+X_training = np.zeros((numSamples - sampleLength, channels, sampleLength, 1))
+Y_training = np.zeros((numSamples - sampleLength, channels, 1))
 
 for i in range(0, numSamples - sampleLength, 1):
 
