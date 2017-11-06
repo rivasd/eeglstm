@@ -56,8 +56,8 @@ for i in range(0, channels):
 
 # replace the data with its normalized version usign the pre processing of Schirrmeister et al. 2017. code freely copied from their github
 other_axis = tuple(range(1, len(fullData.shape)))
-starting_means  = np.mean(fullData[:, init_block_size], axis=other_axis, keepdims=True)
-starting_var    = np.var(fullData[:, init_block_size], axis=other_axis, keepdims=True)
+starting_means  = np.mean(fullData[:, :init_block_size], axis=other_axis, keepdims=True).squeeze()
+starting_var    = np.var(fullData[:, :init_block_size], axis=other_axis, keepdims=True).squeeze()
 
 # we need to keep buffers for the running average and variance
 
@@ -69,7 +69,7 @@ for i in range(0, numSamples):
     if i<init_block_size:
         # for the first samples, there are not enough previous samples to warrant an exponential weighted averaging
         # simply substract the true average of the first samples
-        fullData[:, i] = (fullData[:, i] - starting_means) / np.max(eps, np.sqrt(starting_var))
+        fullData[:, i] = (fullData[:, i] - starting_means) / np.maximum(eps, np.sqrt(starting_var))
     else:
         #update the rolling mean and variance
         averages = 0.999 * averages + 0.001 * fullData[:, i]
