@@ -2,7 +2,7 @@ import argparse
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 from keras.models import Sequential
-from keras.datasets import cifar10
+# from keras.datasets import cifar10
 import pyedflib
 import numpy as np
 """
@@ -14,6 +14,14 @@ sampleLength = 10
 
 #index of the chosen reference electrode
 refChannel = 1
+
+# Length of the starting period for which to use simple standardization instead of exponential moving average
+init_block_size = 1000
+
+# stabilizer for division-by-zero numerical problems
+eps = 1e-4
+
+
 
 """
 Starting the GUI
@@ -44,15 +52,32 @@ for i in range(0, channels):
     if bdfData.getLabel(i) != "Status":
         fullData[i] = bdfData.readSignal(i)
 
-# we need to keep buffers for the running average and variance
 
-averages    = np.zeros(channels)
-variances   = np.zeros(channels)
 
 # replace the data with its normalized version usign the pre processing of Schirrmeister et al. 2017. code freely copied from their github
+other_axis = tuple(range(1, len(fullData.shape)))
+starting_means  = np.mean(fullData[:, init_block_size], axis=other_axis, keepdims=True)
+starting_var    = np.var(fullData[:, init_block_size], axis=other_axis, keepdims=True)
 
-starting_means  = np.mean(fullData, axis=tuple(range(1, len(fullData.shape))), keepdims=True)
-starting_std    = np.std()
+# we need to keep buffers for the running average and variance
+
+averages    = np.copy(starting_means)
+variances   = np.copy(starting_var)
+
+for i in range(0, numSamples):
+
+    if i<init_block_size:
+        # for the first samples, there are not enough previous samples to warrant an exponential weighted averaging
+        # simply substract the true average of the first samples
+        fullData[:, i] = (fullData[:, i] - starting_means) / np.max(eps, np.sqrt(starting_var))
+    else:
+        #update the rolling mean and variance
+        averages = 0.999 * averages + 0.001 * fullData[:, i]
+        variances = 0.999 * variances + 0.001 * (np.square(fullData[:, i] - averages))
+
+        fullData[:, i] = (fullData[:, i] - averages) / np.maximum(eps, np.sqrt(variances))
+
+        
 
 
 # EEG referencing probably not needed since we standardize every window by substrating the image mean and dividing by the standard deviation
