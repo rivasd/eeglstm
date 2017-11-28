@@ -84,6 +84,7 @@ bdfData.apply_function(ewm)
 
 #TODO: drop the stim channel for now, just learn to predict raw EEG
 bdfData.pick_types(eeg=True)
+bdfData.drop_channels(['Status'])
 
 kernelSize = math.floor(bdfData.info['sfreq'] * (convWindow / 1000))
 
@@ -91,7 +92,7 @@ kernelSize = math.floor(bdfData.info['sfreq'] * (convWindow / 1000))
 
 # contructing our training tensors
 
-X_training = np.zeros((numSamples - sampleLength, channels-1, sampleLength))
+X_training = np.zeros((numSamples - sampleLength, sampleLength, channels-1))
 Y_training = np.zeros((numSamples - sampleLength, channels-1))
 
 for i in range(0, numSamples - sampleLength, 1):
@@ -99,13 +100,13 @@ for i in range(0, numSamples - sampleLength, 1):
     input_mat = bdfData[:, i:i+sampleLength][0]
     output_vec = bdfData[:, i+sampleLength][0]
     
-    X_training[i] = input_mat
+    X_training[i] = input_mat.T
     Y_training[i] = output_vec.squeeze()
     pass
 
 # Defined model architecture
 model = Sequential()
-model.add(Conv1D(32, kernelSize, activation='elu', input_shape=(256, X_training.shape[1])))
+model.add(Conv1D(32, kernelSize, activation='elu', input_shape=(256, X_training.shape[2])))
 model.add(MaxPool1D(3,1,))
 model.add(Conv1D(50, 10, activation='elu'))
 model.add(MaxPool1D(3,1,))
