@@ -83,8 +83,8 @@ def ewm(dataArray):
 bdfData.apply_function(ewm)
 
 #TODO: drop the stim channel for now, just learn to predict raw EEG
-bdfData.pick_types(eeg=True)
-bdfData.drop_channels(['Status'])
+bdfData.pick_types(eeg=True,  exclude=['Status'])
+# bdfData.drop_channels(['Status'])
 
 kernelSize = math.floor(bdfData.info['sfreq'] * (convWindow / 1000))
 
@@ -108,14 +108,14 @@ for i in range(0, numSamples - sampleLength, 1):
 model = Sequential()
 model.add(Conv1D(32, kernelSize, activation='elu', input_shape=(256, X_training.shape[2])))
 model.add(MaxPool1D(3,1,))
-model.add(Conv1D(50, 10, activation='elu'))
-model.add(MaxPool1D(3,1,))
+# model.add(Conv1D(50, 10, activation='elu'))
+# model.add(MaxPool1D(3,1,))
 model.add(LSTM(64))
 model.add(Dense(bdfData.info['nchan']))
-model.compile(optimizer='rmsprop', loss='mean_squared_error', metrics=['accuracy'])
+model.compile(optimizer='rmsprop', loss='cosine_proximity', metrics=['accuracy'])
 
 
-hist = model.fit(X_training, Y_training, batch_size=32, epochs=10, verbose=1)
+hist = model.fit(X_training, Y_training, batch_size=32, epochs=100, verbose=1)
 print(hist)
 
 
