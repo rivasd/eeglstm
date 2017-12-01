@@ -112,11 +112,25 @@ model.add(MaxPool1D(3,1,))
 # model.add(MaxPool1D(3,1,))
 model.add(LSTM(64))
 model.add(Dense(bdfData.info['nchan']))
-model.compile(optimizer='rmsprop', loss='cosine_proximity', metrics=['accuracy'])
+model.compile(optimizer='rmsprop', loss='mse', metrics=['mse'])
 
 
-hist = model.fit(X_training, Y_training, batch_size=32, epochs=100, verbose=1)
+hist = model.fit(X_training, Y_training, batch_size=32, epochs=1, verbose=1)
 print(hist)
+
+model.save('model.h5')
+
+synthetic = np.zeros((1000, 256, 16))
+
+for i in range(0, numSamples - sampleLength, 1):
+
+    batch = X_training[i:i+32]
+    synthetic[i] = model.predict_on_batch(batch)
+
+    pass
+
+plt.plot(bdfData[:, :1000][1], synthetic)
+plt.pause(10000)
 
 
 """

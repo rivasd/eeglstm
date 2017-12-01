@@ -100,3 +100,4 @@ ENV/
 # mypy
 .mypy_cache/
 testfiles/Newtest17-256.bdf
+model.h5
