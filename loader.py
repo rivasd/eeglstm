@@ -49,10 +49,22 @@ args = parser.parse_args()
 #TODO: might be too large? find way to load in steps or distributed
 
 bdfData = mne.io.read_raw_edf(args.file, preload=True)
+
+# re-sample if the input is too high
+if bdfData.info['sfreq'] > 256:
+    bdfData.resample(256.0)
+
+
+#TODO: drop the stim channel for now, just learn to predict raw EEG
+bdfData.pick_types(eeg=True,  misc=False, resp=False, exclude=['Status', "EXG1", "EXG2", "EXG3", "EXG4", "EXG5", "EXG6", "EXG7", "EXG8"])
+
 bdfData.set_eeg_reference()                                 #applying eeg average referencing
 bdfData.apply_proj()
 channels = bdfData.info['nchan']        # Assume that one of the channels in the file is the Status Channel. we wont be learning from it since its scale means nothing
 numSamples = len(bdfData) #assuming all channels have the same total number of samples for this recording
+
+
+
 
 # bdfData.plot()
 # plt.pause(100)
@@ -62,7 +74,7 @@ def ewm(dataArray):
     Computes the exponential weighted running mean and updates the mne.Raw data in-place
     """
 
-    normalized = np.zeros(dataArray.shape)
+    # normalized = np.zeros(dataArray.shape)
     starting_means  = np.mean(dataArray[:init_block_size])
     starting_var    = np.var(dataArray[:init_block_size])
     averages    = np.copy(starting_means)
@@ -71,20 +83,20 @@ def ewm(dataArray):
     for i in range(0, len(dataArray)):
         # for the first samples, there are not enough previous samples to warrant an exponential weighted averaging
         # simply substract the true average of the first samples
-        normalized[i] = (dataArray[i] - starting_means) / np.maximum(eps, np.sqrt(starting_var))
-    else:
-        #update the rolling mean and variance
-        averages = 0.999 * averages + 0.001 * dataArray[i]
-        variances = 0.999 * variances + 0.001 * (np.square(dataArray[i] - averages))
+        if i < init_block_size:
+            dataArray[i] = (dataArray[i] - starting_means) / np.maximum(eps, np.sqrt(starting_var))
+        else:
+            #update the rolling mean and variance
+            averages = 0.999 * averages + 0.001 * dataArray[i]
+            variances = 0.999 * variances + 0.001 * (np.square(dataArray[i] - averages))
 
-        normalized[i] = (dataArray[i] - averages) / np.maximum(eps, np.sqrt(variances))    
+            dataArray[i] = (dataArray[i] - averages) / np.maximum(eps, np.sqrt(variances))    
 
-    return normalized
+    return dataArray
 
 bdfData.apply_function(ewm)
 
-#TODO: drop the stim channel for now, just learn to predict raw EEG
-bdfData.pick_types(eeg=True,  exclude=['Status'])
+
 # bdfData.drop_channels(['Status'])
 
 kernelSize = math.floor(bdfData.info['sfreq'] * (convWindow / 1000))
