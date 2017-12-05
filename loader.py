@@ -9,6 +9,7 @@ import numpy as np
 import mne
 import matplotlib.pyplot as plt
 import math
+import pickle
 """
 Some constant hyperparameters of the model
 """
@@ -23,7 +24,7 @@ refChannel = 1
 init_block_size = 1000
 
 # stabilizer for division-by-zero numerical problems
-eps = 1e-4
+eps = 1e-6
 
 convWindow = 50
 
@@ -108,29 +109,19 @@ for i in range(0, numSamples - sampleLength, 1):
 model = Sequential()
 model.add(Conv1D(32, kernelSize, activation='elu', input_shape=(256, X_training.shape[2])))
 model.add(MaxPool1D(3,1,))
-# model.add(Conv1D(50, 10, activation='elu'))
-# model.add(MaxPool1D(3,1,))
+model.add(Conv1D(50, 10, activation='elu'))
+model.add(MaxPool1D(3,1,))
 model.add(LSTM(64))
 model.add(Dense(bdfData.info['nchan']))
 model.compile(optimizer='rmsprop', loss='mse', metrics=['mse'])
 
 
-hist = model.fit(X_training, Y_training, batch_size=32, epochs=1, verbose=1)
-print(hist)
+history = model.fit(X_training, Y_training, batch_size=32, epochs=10, verbose=1)
 
 model.save('model.h5')
 
-synthetic = np.zeros((1000, 256, 16))
-
-for i in range(0, numSamples - sampleLength, 1):
-
-    batch = X_training[i:i+32]
-    synthetic[i] = model.predict_on_batch(batch)
-
-    pass
-
-plt.plot(bdfData[:, :1000][1], synthetic)
-plt.pause(10000)
+with open('trainHistoryDict.txt', 'wb+') as file_pi:
+        pickle.dump(history.history, file_pi)
 
 
 """
