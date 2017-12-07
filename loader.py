@@ -103,7 +103,27 @@ kernelSize = math.floor(bdfData.info['sfreq'] * (convWindow / 1000))
 
 # EEG referencing probably not needed since we standardize every window by substrating the image mean and dividing by the standard deviation
 
-# contructing our training tensors
+# contructing our generator of EEG batches
+
+def batch_generator(mne_Raw, window_len, batch_size):
+
+    data_per_batch = window_len + batch_size -1
+    remainder = len(mne_Raw) % data_per_batch
+    counter = 0
+                 #amount of contiguous EEG data seen within a batch of windows
+
+    while True:
+        for i in range(counter % remainder, len(mne_Raw) - data_per_batch,  data_per_batch):
+
+            batch = np.zeros((batch_size, window_len, mne_Raw.info['nchan']))
+            
+
+            pass
+
+        counter++
+
+        
+
 
 X_training = np.zeros((numSamples - sampleLength, sampleLength, channels-1))
 Y_training = np.zeros((numSamples - sampleLength, channels-1))
@@ -128,7 +148,7 @@ model.add(Dense(bdfData.info['nchan']))
 model.compile(optimizer='rmsprop', loss='mse', metrics=['mse'])
 
 
-history = model.fit(X_training, Y_training, batch_size=32, epochs=10, verbose=1)
+history = model.fit(X_training, Y_training, window_len=32, epochs=10, verbose=1)
 
 model.save('model.h5')
 
