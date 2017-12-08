@@ -20,7 +20,7 @@
                 "RedirectOutput"
             ],
             "args": [
-                "${workspaceFolder}/testfiles/Newtest17-256.bdf"
+                "${workspaceFolder}/testfiles/0403-CT.bdf"
             ]
         },
         {

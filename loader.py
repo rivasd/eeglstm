@@ -3,6 +3,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 from keras.models import Sequential
 from keras.layers import Conv1D, MaxPool1D, LSTM, Dense
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 import numpy as np
 import mne
 import matplotlib.pyplot as plt
@@ -23,6 +24,9 @@ init_block_size = 1000
 
 # stabilizer for division-by-zero numerical problems
 eps = 1e-6
+
+#training batch size
+train_batch_size = 32
 
 convWindow = 50
 
@@ -150,9 +154,13 @@ model.add(LSTM(64))
 model.add(Dense(bdfData.info['nchan']))
 model.compile(optimizer='rmsprop', loss='mse', metrics=['mse'])
 
-history = model.fit_generator(batch_generator(bdfData, 256, 32), steps_per_epoch=(len(bdfData) / (256 + 32)), epochs=1)
+# defining some keras.Callbacks to save weights as we train and stop when no more improvement
+checkpoint = ModelCheckpoint('model.h5', 'loss', verbose=1)
+early = EarlyStopping('loss', 0.001, verbose=1)
 
-model.save('model.h5')
+steps_per_epoch = (len(bdfData) // (256 + train_batch_size-1))
+
+history = model.fit_generator(batch_generator(bdfData, 256, train_batch_size), steps_per_epoch=steps_per_epoch, epochs=100, callbacks=[checkpoint, early])
 
 with open('trainHistoryDict.txt', 'wb+') as file_pi:
         pickle.dump(history.history, file_pi)

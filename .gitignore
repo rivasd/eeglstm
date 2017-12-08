@@ -102,3 +102,4 @@ ENV/
 testfiles/
 model.h5
 trainHistoryDict.txt
+.vscode/
