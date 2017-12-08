@@ -3,8 +3,6 @@ from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 from keras.models import Sequential
 from keras.layers import Conv1D, MaxPool1D, LSTM, Dense
-# from keras.datasets import cifar10
-import pyedflib
 import numpy as np
 import mne
 import matplotlib.pyplot as plt
@@ -105,41 +103,46 @@ kernelSize = math.floor(bdfData.info['sfreq'] * (convWindow / 1000))
 
 # contructing our generator of EEG batches
 
-def batch_generator(mne_Raw, window_len, batch_size):
+def batch_generator(mne_Raw, window_len, batch_size, step=1):
 
-    data_per_batch = window_len + batch_size -1
+    data_per_batch = window_len + ((batch_size -1) * step)
     remainder = len(mne_Raw) % data_per_batch
     counter = 0
                  #amount of contiguous EEG data seen within a batch of windows
 
     while True:
-        for i in range(counter % remainder, len(mne_Raw) - data_per_batch,  data_per_batch):
+        for i in range(counter % remainder, len(mne_Raw) - data_per_batch-1,  data_per_batch):
 
-            batch = np.zeros((batch_size, window_len, mne_Raw.info['nchan']))
+            window = mne_Raw[:, i:i+data_per_batch][0].T
+            strides = window.strides
+            new_strides = (strides[0] * step, strides[0], window_len * strides[0])
+
+            batch_X = np.lib.stride_tricks.as_strided(mne_Raw[:,i:i+data_per_batch][0], shape=(batch_size, window_len, mne_Raw.info['nchan']), strides=new_strides)
+            batch_Y = mne_Raw[:, i+window_len: i+data_per_batch+1][0].T
+
+            yield (batch_X, batch_Y)
             
 
-            pass
-
-        counter++
-
-        
+        counter += 1
 
 
-X_training = np.zeros((numSamples - sampleLength, sampleLength, channels-1))
-Y_training = np.zeros((numSamples - sampleLength, channels-1))
 
-for i in range(0, numSamples - sampleLength, 1):
 
-    input_mat = bdfData[:, i:i+sampleLength][0]
-    output_vec = bdfData[:, i+sampleLength][0]
+# X_training = np.zeros((numSamples - sampleLength, sampleLength, channels-1))
+# Y_training = np.zeros((numSamples - sampleLength, channels-1))
+
+# for i in range(0, numSamples - sampleLength, 1):
+
+#     input_mat = bdfData[:, i:i+sampleLength][0]
+#     output_vec = bdfData[:, i+sampleLength][0]
     
-    X_training[i] = input_mat.T
-    Y_training[i] = output_vec.squeeze()
-    pass
+#     X_training[i] = input_mat.T
+#     Y_training[i] = output_vec.squeeze()
+#     pass
 
 # Defined model architecture
 model = Sequential()
-model.add(Conv1D(32, kernelSize, activation='elu', input_shape=(256, X_training.shape[2])))
+model.add(Conv1D(32, kernelSize, activation='elu', input_shape=(256, bdfData.info['nchan'])))
 model.add(MaxPool1D(3,1,))
 model.add(Conv1D(50, 10, activation='elu'))
 model.add(MaxPool1D(3,1,))
@@ -147,8 +150,7 @@ model.add(LSTM(64))
 model.add(Dense(bdfData.info['nchan']))
 model.compile(optimizer='rmsprop', loss='mse', metrics=['mse'])
 
-
-history = model.fit(X_training, Y_training, window_len=32, epochs=10, verbose=1)
+history = model.fit_generator(batch_generator(bdfData, 256, 32), steps_per_epoch=(len(bdfData) / (256 + 32)), epochs=1)
 
 model.save('model.h5')
 
