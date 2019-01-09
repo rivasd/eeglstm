@@ -54,5 +54,9 @@ test_data.filter(0.1, 50.0, n_jobs="cuda")
 stim_epochs = mne.Epochs(test_data, events=events, event_id={"stimulus presentation":20}, tmin=-0.2, tmax=0.8, reject={"eeg":200-6})
 # do basic cleaning by bandpass filtering, we will need to load the data
 stim_epochs.load_data()
-stim_epochs.resample(256)                
+stim_epochs.resample(256)
+
+
+#%% building the pytorch model
+
 pass
