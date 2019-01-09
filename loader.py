@@ -1,7 +1,7 @@
 import argparse
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import Conv1D, MaxPool1D, LSTM, Dense, Dropout, BatchNormalization
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 import numpy as np
@@ -9,6 +9,7 @@ import mne
 import matplotlib.pyplot as plt
 import math
 import pickle
+import pathlib
 """
 Some constant hyperparameters of the model
 """
@@ -26,7 +27,7 @@ init_block_size = 1000
 eps = 1e-6
 
 #training batch size
-train_batch_size = 32
+train_batch_size = 64
 
 convWindow = 50
 
@@ -59,7 +60,7 @@ if bdfData.info['sfreq'] > 256:
 
 #TODO: drop the stim channel for now, just learn to predict raw EEG
 bdfData.pick_types(eeg=True,  misc=False, resp=False, exclude=['Status', "EXG1", "EXG2", "EXG3", "EXG4", "EXG5", "EXG6", "EXG7", "EXG8"])
-bdfData.pick_channels(bdfData.info['ch_names'][:63])
+bdfData.pick_channels(bdfData.info['ch_names'][:64])
 
 bdfData.set_eeg_reference()                                 #applying eeg average referencing
 bdfData.apply_proj()
@@ -145,32 +146,39 @@ def batch_generator(mne_Raw, window_len, batch_size, step=1):
 #     Y_training[i] = output_vec.squeeze()
 #     pass
 
-# Defined model architecture
-model = Sequential()
-model.add(Conv1D(64, kernelSize, activation='elu', input_shape=(256, bdfData.info['nchan'])))
-model.add(MaxPool1D(5,1,))
-model.add(Dropout(0.2))
-# model.add(BatchNormalization())
-model.add(Conv1D(48, 10, activation='elu'))
-model.add(MaxPool1D(5,1,))
-model.add(Dropout(0.2))
-# model.add(BatchNormalization())
-model.add(Conv1D(16, 5, activation='elu'))
-model.add(MaxPool1D(5,1,))
-model.add(Dropout(0.2))
-# model.add(BatchNormalization())
-model.add(LSTM(128, return_sequences=True))
-model.add(LSTM(64))                             #stacked recurrent layers said to enable deeper time series learning
-model.add(Dense(bdfData.info['nchan']))
-model.compile(optimizer='rmsprop', loss='mse', metrics=['mse'])
+
+saved_model = pathlib.Path("./model-conv.h5")
+
+if saved_model.exists() and saved_model.is_file():
+    model = load_model(str(saved_model))
+else:
+
+    # Defined model architecture
+    model = Sequential()
+    model.add(Conv1D(64, 5, activation='elu', input_shape=(256, bdfData.info['nchan'])))
+    model.add(MaxPool1D(3,1,))
+    model.add(Dropout(0.2))
+    # model.add(BatchNormalization())
+    model.add(Conv1D(48, 5, activation='elu'))
+    model.add(MaxPool1D(3,1,))
+    model.add(Dropout(0.2))
+    # model.add(BatchNormalization())
+    model.add(Conv1D(24, 3, activation='elu'))
+    model.add(MaxPool1D(3,1,))
+    model.add(Dropout(0.2))
+    # model.add(BatchNormalization())
+    model.add(LSTM(128, return_sequences=True))
+    model.add(LSTM(64))                             #stacked recurrent layers said to enable deeper time series learning
+    model.add(Dense(bdfData.info['nchan']))
+    model.compile(optimizer='rmsprop', loss='mse', metrics=['mse'])
 
 # defining some keras.Callbacks to save weights as we train and stop when no more improvement
 checkpoint = ModelCheckpoint('model-conv.h5', 'loss', verbose=1)
-early = EarlyStopping('loss', 0.001, verbose=1, patience=2)
+early = EarlyStopping('loss', 0.001, verbose=1, patience=10)
 
 steps_per_epoch = (len(bdfData) // (256 + train_batch_size-1))
 
-history = model.fit_generator(batch_generator(bdfData, 256, train_batch_size), steps_per_epoch=steps_per_epoch, epochs=100, callbacks=[checkpoint, early])
+history = model.fit_generator(batch_generator(bdfData, 256, train_batch_size), steps_per_epoch=steps_per_epoch, epochs=200, callbacks=[checkpoint, early])
 
 with open('trainHistoryDict.txt', 'wb+') as file_pi:
         pickle.dump(history.history, file_pi)
